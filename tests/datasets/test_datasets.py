@@ -384,6 +384,54 @@ def test_tmp_video_deletion(tmp_path, empty_lerobot_dataset_factory):
     )
 
 
+@pytest.mark.parametrize("writer_threads", [0, 2])
+def test_discard_video_then_rerecord_shorter_episode(tmp_path, empty_lerobot_dataset_factory, writer_threads):
+    """Discarded frames must not leak into a shorter take using the same episode index."""
+    import hashlib
+
+    import av
+
+    key = "observation.images.camera"
+    dataset = empty_lerobot_dataset_factory(
+        root=tmp_path / "discard",
+        features={key: {"dtype": "video", "shape": DUMMY_HWC, "names": ["height", "width", "channels"]}},
+    )
+    if writer_threads:
+        dataset.start_image_writer(num_threads=writer_threads)
+
+    def record_frames(count, color):
+        for _ in range(count):
+            dataset.add_frame({key: np.full(DUMMY_HWC, color, dtype=np.uint8), "task": "test discard"})
+
+    try:
+        record_frames(2, 0)
+        dataset.save_episode(parallel_encoding=False)
+        saved_video = next((dataset.root / "videos").rglob("*.mp4"))
+        saved_hash = hashlib.sha256(saved_video.read_bytes()).hexdigest()
+
+        record_frames(6, 200)
+        discarded_dir = dataset._get_image_file_dir(1, key)
+        dataset.clear_episode_buffer()
+        assert not discarded_dir.exists()
+        assert dataset.episode_buffer["size"] == 0
+        assert dataset.num_episodes == 1
+        assert dataset.meta.total_frames == 2
+        assert hashlib.sha256(saved_video.read_bytes()).hexdigest() == saved_hash
+
+        record_frames(3, 80)
+        dataset.save_episode(parallel_encoding=False)
+    finally:
+        dataset.finalize()
+
+    frames = []
+    for path in sorted((dataset.root / "videos").rglob("*.mp4")):
+        with av.open(str(path)) as container:
+            frames.extend(frame.to_ndarray(format="rgb24") for frame in container.decode(video=0))
+    assert len(frames) == dataset.meta.total_frames == 5
+    assert dataset.num_episodes == 2
+    assert max(float(frame.mean()) for frame in frames) < 100
+
+
 def test_tmp_mixed_deletion(tmp_path, empty_lerobot_dataset_factory):
     """Verify temporary image directories are removed appropriately when both image and video features are present."""
     image_key = "image"

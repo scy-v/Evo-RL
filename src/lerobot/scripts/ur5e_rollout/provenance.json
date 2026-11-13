@@ -1,0 +1,132 @@
+{
+  "source": "/home/suchenyu/RLinf-recap/toolkits/ur_data_collection",
+  "source_repository_commit": "571135466d04439b3772cdb203798016c35f216a",
+  "original_collection_provenance": {
+    "source": "/home/suchenyu/ur_data_collection/lerobot_ur5e_keyteleop",
+    "files": [
+      {
+        "source": "lerobot_robot_ur5e/lerobot_robot_ur5e/__init__.py",
+        "destination": "robot/__init__.py",
+        "sha256": "9ff186aafd0776f3606acda237ac181716e438ced59a6275f6c525a8965e1b7d"
+      },
+      {
+        "source": "lerobot_robot_ur5e/lerobot_robot_ur5e/ur5e.py",
+        "destination": "robot/ur5e.py",
+        "sha256": "5fa3d6f0a14a2528b2c94a9badd0059dd9eb2d13ed606f71d08b947a398d0960"
+      },
+      {
+        "source": "lerobot_robot_ur5e/lerobot_robot_ur5e/config_ur5e.py",
+        "destination": "robot/config_ur5e.py",
+        "sha256": "affbe1bba63ce75198cc80246df8b8d9e007294d03ce0741090e16730036b9c0"
+      },
+      {
+        "source": "lerobot_robot_ur5e/lerobot_robot_ur5e/dummy_camera.py",
+        "destination": "robot/dummy_camera.py",
+        "sha256": "55bffaca2a7eeaf09fdfcd59d69464d96a4647c0feee9a3f6fb98c823f127c16"
+      },
+      {
+        "source": "lerobot_teleoperator_ur5e/lerobot_teleoperator_ur5e/__init__.py",
+        "destination": "teleop/__init__.py",
+        "sha256": "d257eefea9cb10cd9184c3d7247872206db091eef97ab374d8d46466cb63b083"
+      },
+      {
+        "source": "lerobot_teleoperator_ur5e/lerobot_teleoperator_ur5e/config_teleop.py",
+        "destination": "teleop/config_teleop.py",
+        "sha256": "d1f4f4958e8a98f53ce4b81655232a5b749ab320f5540628ddef616d24306ebf"
+      },
+      {
+        "source": "lerobot_teleoperator_ur5e/lerobot_teleoperator_ur5e/teleop.py",
+        "destination": "teleop/teleop.py",
+        "sha256": "d76302cc355103f6c0958d1c83f9396d4f266f2ec0fa4a792070431916c29052"
+      },
+      {
+        "source": "scripts/core/run_record.py",
+        "destination": "recording.py",
+        "sha256": "5c5a369bf562870306d0d72eb9d63a160ca7ffdb6695db40672f7dfc0ee0bc8d"
+      },
+      {
+        "source": "scripts/core/record_loop.py",
+        "destination": "record_loop.py",
+        "sha256": "63ed5e4a170888f049bcb00e3caa5bdcac36cc978ffcada74b2ff74cf3a153ec"
+      },
+      {
+        "source": "scripts/utils/dataset_utils.py",
+        "destination": "dataset_utils.py",
+        "sha256": "7f85e8ffe373c9cbb48997a1cfb4b60cc8be8a5d90643160edb2acc756010cc1"
+      }
+    ],
+    "changes": [
+      "Imports scoped to toolkits.ur_data_collection; shared hardware factory extracted from run_record.",
+      "Model rollout, episode outcome and intervention recording added separately.",
+      "Robot disconnect releases RTDE, cameras and the gripper reader, including partial connection failures.",
+      "Escape disconnect is disabled for model rollout; episode controls discard the episode and own cleanup.",
+      "Added RLinf license headers and applied repository formatting; action and observation definitions and control math preserved.",
+      "Unrecorded manual reset retains original keyboard motion and Right-arrow automatic reset; console messages use the RLinf logger.",
+      "Rollout input gating clears queued motion and suppresses held keys across reset/review/start transitions; the standalone keyboard record flow stays enabled by default."
+    ]
+  },
+  "migrated_files": [
+    {
+      "path": "__init__.py",
+      "source_sha256": "04c7c3928985b6259f48236b6b28a599bf8df8fc11bc860f0a4a14a2841f3b9f"
+    },
+    {
+      "path": "terminal.py",
+      "source_sha256": "09d491cccc9889a02565a15a38c264ce1346a3819cd36b8db164e6c843651ace"
+    },
+    {
+      "path": "run_rollout.py",
+      "source_sha256": "d157c4bf97d3df4e42ee95e503c2237527098ef094499a3335404c53c3a77cbc"
+    },
+    {
+      "path": "policy.py",
+      "source_sha256": "6c81c116de509e11adc7d637de369508fe980e50b3d7662006798ae03be4e845"
+    },
+    {
+      "path": "recording.py",
+      "source_sha256": "c09068b849cfa477468e51072a3f7c3b3527cfb1c9109428ea42e40d280e167e"
+    },
+    {
+      "path": "controls.py",
+      "source_sha256": "5bd442261f1060ccca2a40e5fc8ae2c79ab1bed32ce5f18cdd32a71228b19efe"
+    },
+    {
+      "path": "rollout_loop.py",
+      "source_sha256": "d1a616cd4dffebab7024897cfd26077e48b1e6422523c35f7dc71b904a138112"
+    },
+    {
+      "path": "teleop/__init__.py",
+      "source_sha256": "0445ad86fc8b2e9c7b164df4670bf7c7eb49d7596fdf51b82f65005d8ae063dd"
+    },
+    {
+      "path": "teleop/config_teleop.py",
+      "source_sha256": "66a5f48a7044e2eb6f765c2c7416b3f545e68919c7cc0942e52246889a781a10"
+    },
+    {
+      "path": "teleop/teleop.py",
+      "source_sha256": "a76763fc2f00ef638abd07c9bfcea53e03d77961c029e885c45f9f0b4f204f16"
+    },
+    {
+      "path": "robot/__init__.py",
+      "source_sha256": "af0c83838687939fbeb5e3ea73d421bf88bbb89bc35d90c7c739e20fc1288dde"
+    },
+    {
+      "path": "robot/ur5e.py",
+      "source_sha256": "4aa87201e2f4305a154173af7939e7d63e172f174b6068eeba385c6bf7eabf8e"
+    },
+    {
+      "path": "robot/config_ur5e.py",
+      "source_sha256": "3e9f9e4f64d355ec76c791ac143a58c7edd3b245ccb171fc6fad34106fbc0d55"
+    },
+    {
+      "path": "robot/dummy_camera.py",
+      "source_sha256": "cce4031c0469612e762640e0b03a334d18503fa9e83c9b30096ab37bbb84f5c0"
+    }
+  ],
+  "changes": [
+    "Native Evo-RL PI05 processors and full chunk inference; SFT/ACP task conditioning.",
+    "Episode-level outcome and float intervention schema, without fabricated policy_action.",
+    "Standard logging and YAML; no RLinf/OpenPI runtime imports.",
+    "UR control and keyboard action semantics retained."
+  ]
+}

@@ -1298,8 +1298,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 self.episodes_since_last_encoding = 0
 
         if not episode_data:
-            # Reset episode buffer and clean up temporary images (if not already deleted during video encoding)
-            self.clear_episode_buffer(delete_images=len(self.meta.image_keys) > 0)
+            # Saved video staging must survive until batched encoding consumes it.
+            # Only discarded episodes should remove staging for all camera keys.
+            self._delete_camera_frame_dirs(self.meta.image_keys)
+            self.clear_episode_buffer(delete_images=False)
 
     def _batch_save_episode_video(self, start_episode: int, end_episode: int | None = None) -> None:
         """
@@ -1529,19 +1531,21 @@ class LeRobotDataset(torch.utils.data.Dataset):
         }
         return metadata
 
+    def _delete_camera_frame_dirs(self, camera_keys: list[str]) -> None:
+        # Drain pending writes before deleting directories, so workers cannot recreate them.
+        if self.image_writer is not None:
+            self._wait_image_writer()
+        episode_index = self.episode_buffer["episode_index"]
+        if isinstance(episode_index, np.ndarray):
+            episode_index = episode_index.item() if episode_index.size == 1 else episode_index[0]
+        for cam_key in camera_keys:
+            img_dir = self._get_image_file_dir(episode_index, cam_key)
+            if img_dir.is_dir():
+                shutil.rmtree(img_dir)
+
     def clear_episode_buffer(self, delete_images: bool = True) -> None:
-        # Clean up image files for the current episode buffer
         if delete_images:
-            # Wait for the async image writer to finish
-            if self.image_writer is not None:
-                self._wait_image_writer()
-            episode_index = self.episode_buffer["episode_index"]
-            if isinstance(episode_index, np.ndarray):
-                episode_index = episode_index.item() if episode_index.size == 1 else episode_index[0]
-            for cam_key in self.meta.image_keys:
-                img_dir = self._get_image_file_dir(episode_index, cam_key)
-                if img_dir.is_dir():
-                    shutil.rmtree(img_dir)
+            self._delete_camera_frame_dirs(self.meta.camera_keys)
 
         # Reset the buffer
         self.episode_buffer = self.create_episode_buffer()

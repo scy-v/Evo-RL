@@ -17,11 +17,82 @@
 from unittest.mock import patch
 
 import datasets
+import numpy as np
+import pyarrow.parquet as pq
+import pytest
 import torch
 
 from lerobot.datasets.aggregate import aggregate_datasets
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from tests.fixtures.constants import DUMMY_REPO_ID
+
+
+@pytest.mark.parametrize("max_file_mb", [100, 0.000001], ids=["consolidate", "rotate-chunks"])
+def test_episode_metadata_locations_survive_repeated_merge(tmp_path, max_file_mb):
+    """Merging multi-file sources must leave usable metadata for the next merge."""
+    features = {
+        "action": {"dtype": "float32", "shape": (1,), "names": None},
+        "observation.state": {"dtype": "float32", "shape": (1,), "names": None},
+    }
+
+    def create_source(name, values):
+        root = tmp_path / name
+        for index, value in enumerate(values):
+            # Separate recording sessions naturally create multiple metadata files.
+            ds = (
+                LeRobotDataset(f"test/{name}", root=root)
+                if index
+                else LeRobotDataset.create(f"test/{name}", fps=10, root=root, features=features)
+            )
+            for frame in range(2):
+                ds.add_frame(
+                    {
+                        "action": np.array([value + frame], dtype=np.float32),
+                        "observation.state": np.array([value], dtype=np.float32),
+                        "task": "merge regression",
+                    }
+                )
+            ds.save_episode(extra_episode_metadata={"episode_success": "success"})
+            ds.finalize()
+        return root
+
+    def assert_locations(root, episode_count):
+        all_ids = []
+        for path in sorted((root / "meta/episodes").rglob("*.parquet")):
+            rows = pq.read_table(path).to_pylist()
+            chunk = int(path.parent.name.split("-")[1])
+            file = int(path.stem.split("-")[1])
+            for row in rows:
+                assert row["meta/episodes/chunk_index"] == chunk
+                assert row["meta/episodes/file_index"] == file
+                assert row["episode_success"] == "success"
+                all_ids.append(row["episode_index"])
+        assert all_ids == list(range(episode_count))
+
+    a, b, c = create_source("a", [10, 20]), create_source("b", [30]), create_source("c", [40])
+    assert len(list((a / "meta/episodes").rglob("*.parquet"))) == 2
+    ab = tmp_path / "ab"
+    aggregate_datasets(
+        ["test/a", "test/b"],
+        "test/ab",
+        roots=[a, b],
+        aggr_root=ab,
+        data_files_size_in_mb=max_file_mb,
+        chunk_size=2,
+    )
+    assert_locations(ab, 3)
+    assert len(list((ab / "meta/episodes").rglob("*.parquet"))) == (1 if max_file_mb == 100 else 3)
+    if max_file_mb < 1:
+        assert (ab / "meta/episodes/chunk-001/file-000.parquet").is_file()
+
+    abc = tmp_path / "abc"
+    aggregate_datasets(["test/ab", "test/c"], "test/abc", roots=[ab, c], aggr_root=abc)
+    assert_locations(abc, 4)
+    loaded = LeRobotDataset("test/abc", root=abc)
+    assert loaded.num_frames == 8
+    np.testing.assert_array_equal(
+        loaded.hf_dataset.with_format(None)["action"], [10, 11, 20, 21, 30, 31, 40, 41]
+    )
 
 
 def assert_episode_and_frame_counts(aggr_ds, expected_episodes, expected_frames):
