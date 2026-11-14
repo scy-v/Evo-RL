@@ -8,7 +8,7 @@ policy:
 # For ACP weights, change model.checkpoint_dir and set enable=true.
 # The positive Advantage condition is added internally; keep description unchanged.
 acp_inference:
-  enable: false
+  enable: True
   use_cfg: false
   cfg_beta: 1.0
 task:
@@ -108,7 +108,7 @@ cameras:
   width: 640
   height: 480
 model:
-  checkpoint_dir: /home/suchenyu/Evo-RL/checkpoints/sft/pi05_ur5e_insert_black_rack/run_01/checkpoints/030000/pretrained_model
+  checkpoint_dir: /home/suchenyu/Evo-RL/checkpoints/acp/round_001/checkpoints/005000/pretrained_model
   device: cuda:0
   torch_num_threads: 4
   sample_steps: 10
