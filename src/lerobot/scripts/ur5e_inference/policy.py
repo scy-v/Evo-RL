@@ -30,6 +30,7 @@ from safetensors.torch import load_file
 
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.policies.pi05.configuration_pi05 import PI05Config
+from lerobot.rl.acp_tags import build_acp_tagged_task
 
 IMAGE_KEYS = {
     "observation/image": "observation.images.exterior_image",
@@ -148,17 +149,45 @@ def observation_to_batch(observation: dict[str, Any]) -> dict[str, Any]:
 class URPolicy:
     """Expose full fresh PI05 chunks as unnormalized physical robot actions."""
 
-    def __init__(self, model, preprocessor, postprocessor):
+    def __init__(self, model, preprocessor, postprocessor, acp_inference=None):
         self.model = model
         self.preprocessor = preprocessor
         self.postprocessor = postprocessor
+        options = acp_inference or {}
+        self.acp_enabled = options.get("enable", False)
+        self.use_cfg = options.get("use_cfg", False)
+        self.cfg_beta = float(options.get("cfg_beta", 1.0))
+        if not isinstance(self.acp_enabled, bool) or not isinstance(self.use_cfg, bool):
+            raise ValueError("acp_inference.enable and use_cfg must be YAML booleans")
+        if self.use_cfg and not self.acp_enabled:
+            raise ValueError("acp_inference.use_cfg requires enable=true")
+        if not np.isfinite(self.cfg_beta) or self.cfg_beta < 0:
+            raise ValueError("acp_inference.cfg_beta must be finite and nonnegative")
+
+    def _predict_chunk(self, observation, *, positive=False):
+        batch = observation_to_batch(observation)
+        if positive:
+            batch["task"] = build_acp_tagged_task(batch["task"], is_positive=True)
+        batch = self.preprocessor(batch)
+        # UR executes only a leading horizon, so never retain a LeRobot action queue.
+        return self.postprocessor(self.model.predict_action_chunk(batch))
 
     @torch.inference_mode()
     def infer(self, observation: dict[str, Any]) -> dict[str, np.ndarray]:
-        batch = self.preprocessor(observation_to_batch(observation))
-        # UR executes only a leading horizon, so never retain a LeRobot action queue.
-        actions = self.model.predict_action_chunk(batch)
-        actions = self.postprocessor(actions).squeeze(0).cpu().numpy()
+        if self.use_cfg:
+            device = torch.device(self.model.config.device)
+            devices = []
+            if device.type == "cuda":
+                devices = [device.index if device.index is not None else torch.cuda.current_device()]
+            # Match recording_hil: both branches use the same noise, and guidance
+            # combines postprocessed actions. Fresh chunks need no queue snapshots.
+            with torch.random.fork_rng(devices=devices):
+                conditional = self._predict_chunk(observation, positive=True)
+            unconditional = self._predict_chunk(observation)
+            actions = unconditional + self.cfg_beta * (conditional - unconditional)
+        else:
+            actions = self._predict_chunk(observation, positive=self.acp_enabled)
+        actions = actions.squeeze(0).cpu().numpy()
         expected = (self.model.config.chunk_size, 7)
         if actions.shape != expected or not np.isfinite(actions).all():
             raise ValueError(f"Expected finite actions with shape {expected}, got {actions.shape}")
@@ -214,7 +243,12 @@ def create_policy(config: dict[str, Any]) -> URPolicy:
         cfg.compile_mode,
     )
     logging.info("Normalization restored from checkpoint processor states (QUANTILES)")
-    return URPolicy(model, preprocessor, postprocessor)
+    policy = URPolicy(model, preprocessor, postprocessor, config.get("acp_inference"))
+    logging.info(
+        "ACP inference: enable=%s, use_cfg=%s, cfg_beta=%s",
+        policy.acp_enabled, policy.use_cfg, policy.cfg_beta,
+    )
+    return policy
 
 
 def check_model(config: dict[str, Any]) -> None:

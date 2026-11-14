@@ -84,7 +84,11 @@ def value_train(
     if accelerator is None:
         from accelerate.utils import DistributedDataParallelKwargs
 
-        ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=False)
+        # The vision-language path loads a full SigLIP model but only calls
+        # get_image_features; its text tower and contrastive logits are unused.
+        ddp_kwargs = DistributedDataParallelKwargs(
+            find_unused_parameters=cfg.value.mode == "vision_language"
+        )
         force_cpu = cfg.value.device == "cpu"
         accelerator = Accelerator(
             step_scheduler_with_optimizer=False,

@@ -68,7 +68,7 @@ def compare_sft_reference(cfg, work):
 def main():
     torch.set_num_threads(2)
     work = Path(__file__).parent
-    blocks = (work / "run_commands.md").read_text().split("```bash\n")
+    blocks = (work / "训练命令.md").read_text().split("```bash\n")
     command = next(block.split("```", 1)[0] for block in blocks[1:] if "accelerate launch" in block and "--acp.enable=false" in block)
     words = shlex.split(command.replace("\\\n", " "))
     env_indices = next(word.split("=", 1)[1] for word in words if word.startswith("OBS_INDICES="))

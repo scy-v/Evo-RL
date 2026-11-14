@@ -5,6 +5,12 @@ output_root: /home/suchenyu/Evo-RL/results/ur5e
 policy:
   location: local
   cuda_visible_devices: '0'
+# For ACP weights, change model.checkpoint_dir and set enable=true.
+# The positive Advantage condition is added internally; keep description unchanged.
+acp_inference:
+  enable: false
+  use_cfg: false
+  cfg_beta: 1.0
 task:
   description: Insert the black rack into the blue slot
 video:

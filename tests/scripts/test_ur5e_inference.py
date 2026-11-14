@@ -156,3 +156,48 @@ def test_each_infer_requests_a_fresh_full_chunk(observation):
     assert first["actions"].shape == (50, 7)
     assert np.all(first["actions"] == 2)
     assert np.all(second["actions"] == 4)
+
+
+@pytest.mark.parametrize("enabled,use_cfg,beta", [(False, False, 1), (True, False, 1), (True, True, 0), (True, True, 1), (True, True, 2)])
+def test_acp_prompt_and_cfg_share_noise(observation, enabled, use_cfg, beta):
+    from lerobot.rl.acp_tags import build_acp_tagged_task
+
+    prompt = observation["prompt"]
+    positive = build_acp_tagged_task(prompt, is_positive=True)
+
+    class Model:
+        config = SimpleNamespace(chunk_size=50, device="cpu")
+
+        def __init__(self):
+            self.tasks = []
+            self.noises = []
+
+        def predict_action_chunk(self, batch):
+            self.tasks.append(batch["task"])
+            noise = torch.rand(1, 50, 7)
+            self.noises.append(noise)
+            return noise + (2 if batch["task"] == positive else 0)
+
+    model = Model()
+    policy = URPolicy(model, lambda batch: batch, lambda action: action.square(),
+                      {"enable": enabled, "use_cfg": use_cfg, "cfg_beta": beta})
+    result = policy.infer(observation)["actions"]
+    assert observation["prompt"] == prompt
+    if use_cfg:
+        assert model.tasks == [positive, prompt]
+        torch.testing.assert_close(model.noises[0], model.noises[1])
+        unconditional = model.noises[0].square()
+        conditional = (model.noises[0] + 2).square()
+        expected = unconditional + beta * (conditional - unconditional)
+    else:
+        assert model.tasks == [positive if enabled else prompt]
+        expected = (model.noises[0] + (2 if enabled else 0)).square()
+    np.testing.assert_allclose(result, expected.squeeze(0).numpy(), rtol=1e-6)
+
+
+@pytest.mark.parametrize("options", [
+    {"use_cfg": True}, {"enable": "false"}, {"cfg_beta": -1}, {"cfg_beta": float("nan")},
+])
+def test_invalid_acp_options_are_rejected(options):
+    with pytest.raises(ValueError):
+        URPolicy(None, None, None, options)
